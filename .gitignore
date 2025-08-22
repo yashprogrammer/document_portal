@@ -1,0 +1,11 @@
+env
+.env
+proj_env
+document_portal.egg-info
+venv/
+__pycache__/
+logs/
+*.pyc
+faiss_index/
+main_archive/
+data/

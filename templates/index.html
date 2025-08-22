@@ -1,0 +1,310 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Document Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Google Fonts for classy look -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="/static/style.css" rel="stylesheet" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="logo">📚</span>
+      <h1>Document Portal</h1>
+    </div>
+    <nav class="mode-switch">
+      <button class="tab-btn active" data-tab="analysis">Document Analysis</button>
+      <button class="tab-btn" data-tab="compare">Document Compare</button>
+      <button class="tab-btn" data-tab="chat">Doc Chat</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- ============== ANALYSIS ============== -->
+    <section id="tab-analysis" class="tab-panel active">
+      <div class="card">
+        <h2>🔎 Analyze a Document</h2>
+        <p class="muted">Upload a PDF and get structured analysis.</p>
+        <form id="form-analyze" class="form-grid" onsubmit="return false;">
+          <div class="field">
+            <label for="an-file">Upload PDF</label>
+            <input id="an-file" type="file" accept=".pdf" required />
+            <small class="help">Only .pdf files</small>
+          </div>
+          <div class="actions">
+            <button id="btn-analyze" class="btn primary">Run Analysis</button>
+          </div>
+        </form>
+        <div id="an-result" class="result-block">
+          <h3>Result</h3>
+          <pre class="code" id="an-json">Waiting for analysis…</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== COMPARE ============== -->
+    <section id="tab-compare" class="tab-panel">
+      <div class="card">
+        <h2>🆚 Compare Two Documents</h2>
+        <p class="muted">Upload a reference PDF and an actual PDF to see page-wise differences.</p>
+        <form id="form-compare" class="form-grid-2" onsubmit="return false;">
+          <div class="field">
+            <label for="cmp-ref">Reference PDF</label>
+            <input id="cmp-ref" type="file" accept=".pdf" required />
+          </div>
+          <div class="field">
+            <label for="cmp-act">Actual PDF</label>
+            <input id="cmp-act" type="file" accept=".pdf" required />
+          </div>
+          <div class="actions span-2">
+            <button id="btn-compare" class="btn primary">Compare</button>
+          </div>
+        </form>
+
+        <div id="cmp-result" class="result-block">
+          <h3>Comparison Result</h3>
+          <div class="table-wrap">
+            <table id="cmp-table">
+              <thead>
+                <tr><th>Page</th><th>Changes</th></tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="2" class="muted center">No data yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== CHAT ============== -->
+    <section id="tab-chat" class="tab-panel">
+      <div class="card">
+        <h2>💬 Chat with your Documents</h2>
+        <p class="muted">Upload PDF/DOCX/TXT; we’ll index to FAISS and enable RAG chat.</p>
+
+        <form id="form-chat-index" class="form-grid" onsubmit="return false;">
+          <div class="field">
+            <label for="chat-files">Upload files</label>
+            <input id="chat-files" type="file" multiple accept=".pdf,.docx,.txt" />
+            <small class="help">You can select multiple files.</small>
+          </div>
+
+          <div class="grid-3">
+            <div class="field">
+              <label for="chat-session">Session ID (optional)</label>
+              <input id="chat-session" type="text" placeholder="Leave blank for auto session" />
+            </div>
+            <div class="field">
+              <label for="chat-chunk">Chunk size</label>
+              <input id="chat-chunk" type="number" value="1000" min="200" step="100" />
+            </div>
+            <div class="field">
+              <label for="chat-overlap">Chunk overlap</label>
+              <input id="chat-overlap" type="number" value="200" min="0" step="50" />
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="field">
+              <label for="chat-k">Top-K</label>
+              <input id="chat-k" type="number" value="5" min="1" max="20" />
+            </div>
+            <div class="field toggle-row">
+              <label>Use session-based FAISS</label>
+              <label class="switch">
+                <input id="chat-sessionized" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="btn-build" class="btn primary">Build / Update Index</button>
+          </div>
+        </form>
+
+        <div class="divider"></div>
+
+        <form id="form-chat-ask" class="form-grid" onsubmit="return false;">
+          <div class="field">
+            <label for="chat-q">Your Question</label>
+            <input id="chat-q" type="text" placeholder="Ask a question about your documents…" />
+          </div>
+          <div class="actions">
+            <button id="btn-ask" class="btn">Send</button>
+          </div>
+        </form>
+
+        <div id="chat-meta" class="muted small"></div>
+
+        <div id="chat-ans" class="result-block">
+          <h3>Answer</h3>
+          <div class="answer" id="chat-answer">No answer yet.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <div>© Document Portal • Demo UI</div>
+    <div class="tiny">Frontend only – hook to your FastAPI later.</div>
+  </footer>
+
+  <script>
+  // Base URL for API (same origin when opened via FastAPI)
+  const API_BASE = "";
+
+  // Tab switching (unchanged)
+  const tabs = document.querySelectorAll(".tab-btn");
+  const panels = document.querySelectorAll(".tab-panel");
+  tabs.forEach(btn => {
+    btn.addEventListener("click", () => {
+      tabs.forEach(b => b.classList.remove("active"));
+      panels.forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    });
+  });
+
+  // ===== ANALYZE =====
+  document.getElementById("btn-analyze").addEventListener("click", async () => {
+    const file = document.getElementById("an-file").files[0];
+    const out  = document.getElementById("an-json");
+    if (!file) { out.textContent = "Please upload a PDF."; return; }
+
+    try {
+      out.textContent = "Running analysis…";
+      const fd = new FormData();
+      fd.append("file", file); // <-- must be 'file' to match FastAPI
+
+      const res = await fetch(`${API_BASE}/analyze`, { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({detail:res.statusText}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const json = await res.json();
+      out.textContent = JSON.stringify(json, null, 2);
+    } catch (e) {
+      out.textContent = "Error: " + (e.message || e);
+    }
+  });
+
+  // ===== COMPARE =====
+  document.getElementById("btn-compare").addEventListener("click", async () => {
+    const ref   = document.getElementById("cmp-ref").files[0];
+    const act   = document.getElementById("cmp-act").files[0];
+    const tbody = document.querySelector("#cmp-table tbody");
+
+    if (!ref || !act) {
+      tbody.innerHTML = `<tr><td colspan="2" class="muted center">Upload both PDFs.</td></tr>`;
+      return;
+    }
+
+    try {
+      tbody.innerHTML = `<tr><td colspan="2" class="center">Comparing…</td></tr>`;
+
+      const fd = new FormData();
+      fd.append("reference", ref); // <-- must be 'reference'
+      fd.append("actual", act);    // <-- must be 'actual'
+
+      const res = await fetch(`${API_BASE}/compare`, { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({detail:res.statusText}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const json = await res.json(); // { rows: [...] }
+      const rows = json.rows || [];
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="2" class="muted center">No differences found.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const page = r.Page ?? r.page ?? "";
+        const chg  = r.Changes ?? r.changes ?? "";
+        return `<tr><td>${page}</td><td>${chg}</td></tr>`;
+      }).join("");
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="2" class="muted center">Error: ${e.message || e}</td></tr>`;
+    }
+  });
+
+  // ===== CHAT (index + ask) =====
+  let currentSession = null;
+
+  document.getElementById("btn-build").addEventListener("click", async () => {
+    const files     = document.getElementById("chat-files").files;
+    const sessionId = document.getElementById("chat-session").value.trim();
+    const useSess   = document.getElementById("chat-sessionized").checked;
+    const k         = +document.getElementById("chat-k").value || 5;
+    const chunk     = +document.getElementById("chat-chunk").value || 1000;
+    const overlap   = +document.getElementById("chat-overlap").value || 200;
+    const meta      = document.getElementById("chat-meta");
+
+    if (!files.length) { meta.textContent = "Please upload at least one file."; return; }
+
+    try {
+      meta.textContent = "Building index…";
+
+      const fd = new FormData();
+      [...files].forEach(f => fd.append("files", f)); // <-- must be 'files'
+      if (sessionId) fd.append("session_id", sessionId);
+      fd.append("use_session_dirs", useSess ? "true" : "false");
+      fd.append("chunk_size", String(chunk));
+      fd.append("chunk_overlap", String(overlap));
+      fd.append("k", String(k));
+
+      const res = await fetch(`${API_BASE}/chat/index`, { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({detail:res.statusText}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const json = await res.json(); // { session_id, k, use_session_dirs }
+      currentSession = json.session_id || sessionId || null;
+      meta.textContent = `Indexed. session=${currentSession || "(none)"}, k=${json.k}`;
+    } catch (e) {
+      meta.textContent = "Indexing failed: " + (e.message || e);
+    }
+  });
+
+  document.getElementById("btn-ask").addEventListener("click", async () => {
+    const q        = document.getElementById("chat-q").value.trim();
+    const ans      = document.getElementById("chat-answer");
+    const useSess  = document.getElementById("chat-sessionized").checked;
+    const k        = +document.getElementById("chat-k").value || 5;
+
+    if (!q) { ans.textContent = "Please enter a question."; return; }
+    if (useSess && !currentSession) {
+      ans.textContent = "Build the index first (session-based mode is ON).";
+      return;
+    }
+
+    try {
+      ans.textContent = "Thinking…";
+
+      const fd = new FormData();
+      fd.append("question", q);
+      fd.append("use_session_dirs", useSess ? "true" : "false");
+      fd.append("k", String(k));
+      if (useSess && currentSession) fd.append("session_id", currentSession);
+
+      const res = await fetch(`${API_BASE}/chat/query`, { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({detail:res.statusText}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const json = await res.json(); // { answer, ... }
+      ans.textContent = json.answer || "No answer.";
+    } catch (e) {
+      ans.textContent = "Query failed: " + (e.message || e);
+    }
+  });
+</script>
+
+</body>
+</html>
