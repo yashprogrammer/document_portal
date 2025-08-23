@@ -1,61 +1,54 @@
 {
-    "family": "documentportaltd",
-    "networkMode": "awsvpc",
-    "executionRoleArn": "arn:aws:iam::685057748560:role/ecsTaskExecutionRole",
-    "requiresCompatibilities": ["FARGATE"],
-    "cpu": "1024",
-    "memory": "8192",
-    "containerDefinitions": [
-      {
-        "name": "document-portal-container",
-        "image": "685057748560.dkr.ecr.us-east-1.amazonaws.com/documentportal:latest",
-        "cpu": 1024,
-        "essential": true,
-        "portMappings": [
-          {
-            "containerPort": 8080,
-            "hostPort": 8080,
-            "protocol": "tcp",
-            "name": "document-portal-container-8080-tcp",
-            "appProtocol": "http"
-          }
-        ],
-        "environment": [
-          {
-            "name": "LANGCHAIN_PROJECT",
-            "value": "DOCUMENT PORTAL"
-          }
-        ],
-        "secrets": [
-          {
-            "name": "GROQ_API_KEY",
-            "valueFrom": "arn:aws:secretsmanager:us-east-1:685057748560:secret:GROQ_API_KEY"
-          },
-          {
-            "name": "HF_TOKEN",
-            "valueFrom": "arn:aws:secretsmanager:us-east-1:685057748560:secret:HF_TOKEN"
-          },
-          {
-            "name": "GOOGLE_API_KEY",
-            "valueFrom": "arn:aws:secretsmanager:us-east-1:685057748560:secret:GOOGLE_API_KEY"
-          },
-          {
-            "name": "LANGCHAIN_API_KEY",
-            "valueFrom": "arn:aws:secretsmanager:us-east-1:685057748560:secret:LANGCHAIN_API_KEY"
-          }
-        ],
-        "logConfiguration": {
-          "logDriver": "awslogs",
-          "options": {
-            "awslogs-group": "/ecs/documentportaltd",
-            "awslogs-region": "us-east-1",
-            "awslogs-stream-prefix": "ecs",
-            "awslogs-create-group": "false",
-            "mode": "non-blocking",
-            "max-buffer-size": "25m"
-          }
+  "family": "documentportaltd",
+  "networkMode": "awsvpc",
+  "executionRoleArn": "arn:aws:iam::459497895986:role/ecsTaskExecutionRole",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "8192",
+  "containerDefinitions": [
+    {
+      "name": "document-portal-container",
+      "image": "459497895986.dkr.ecr.ap-southeast-2.amazonaws.com/documentportal",
+      "cpu": 1024,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp",
+          "name": "document-portal-container-8080-tcp",
+          "appProtocol": "http"
+        }
+      ],
+      "environment": [
+        {
+          "name": "LANGCHAIN_PROJECT",
+          "value": "DOCUMENT PORTAL"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "GROQ_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-southeast-2:459497895986:secret:GROQ_API_KEY"
+        },
+        
+        {
+          "name": "GOOGLE_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-southeast-2:459497895986:secret:GOOGLE_API_KEY"
+        }
+        
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/documentportaltd",
+          "awslogs-region": "ap-southeast-2",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "false",
+          "mode": "non-blocking",
+          "max-buffer-size": "25m"
         }
       }
-    ]
-  }
-  
+    }
+  ]
+}
