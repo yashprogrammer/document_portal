@@ -18,7 +18,7 @@ class DocumentComparatorLLM:
         self.parser = JsonOutputParser(pydantic_object=SummaryResponse)
         self.fixing_parser = OutputFixingParser.from_llm(parser=self.parser, llm=self.llm)
         self.prompt = PROMPT_REGISTRY["document_comparison"]
-        self.chain = self.prompt | self.llm | self.parser  
+        self.chain = self.prompt | self.llm | self.parser
         self.log.info("DocumentComparatorLLM initialized with model and parser.")
 
     def compare_documents(self,combined_docs: str) -> pd.DataFrame:
@@ -35,11 +35,11 @@ class DocumentComparatorLLM:
             self.log.info("Document comparison completed", response=response)
             return self._format_response(response)
 
-            
+
         except Exception as e:
             self.log.error(f"Error in compare_documents: {e}")
             raise DocumentPortalException("An error occurred while comparing documents.",sys)
-    
+
     def _format_response(self,response_parsed: list[dict]) -> pd.DataFrame: #type: ignore
         """
         Formats the response from the LLM into a structured format.

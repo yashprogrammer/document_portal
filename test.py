@@ -22,7 +22,7 @@
 # #         dummy_pdf = DummyFile(PDF_PATH)
 
 # #         handler = DocumentHandler(session_id="test_ingestion_analysis")
-        
+
 # #         saved_path = handler.save_pdf(dummy_pdf)
 # #         print(f"PDF saved at: {saved_path}")
 
@@ -32,7 +32,7 @@
 # #         # ---------- STEP 2: DATA ANALYSIS ----------
 # #         print("Starting metadata analysis...")
 # #         analyzer = DocumentAnalyzer()  # Loads LLM + parser
-        
+
 # #         analysis_result = analyzer.analyze_document(text_content)
 
 # #         # ---------- STEP 3: DISPLAY RESULTS ----------
@@ -85,14 +85,14 @@
 #     # ---- Step 2: Run LLM comparison ---- #
 #     llm_comparator = DocumentComparatorLLM()
 #     df = llm_comparator.compare_documents(combined_text)
-    
+
 #     print("\n Comparison DataFrame:\n")
 #     print(df)
 
 # if __name__ == "__main__":
 #     test_compare_documents()
-    
-    
+
+
 ## testing for multidoc chat
 import sys
 from pathlib import Path
@@ -107,45 +107,45 @@ def test_document_ingestion_and_rag():
             "/Users/yashpatil/Developer/AI/LLMOps/Proj1/document_portal/data/multi_doc_chat/sample.pdf",
             "/Users/yashpatil/Developer/AI/LLMOps/Proj1/document_portal/data/multi_doc_chat/state_of_the_union.txt"
         ]
-        
+
         uploaded_files = []
-        
+
         for file_path in test_files:
             if Path(file_path).exists():
                 uploaded_files.append(open(file_path, "rb"))
             else:
                 print(f"File does not exist: {file_path}")
-                
+
         if not uploaded_files:
             print("No valid files to upload.")
             sys.exit(1)
-            
+
         ingestor = DocumentIngestor()
-        
+
         retriever = ingestor.ingest_files(uploaded_files)
-        
+
         for f in uploaded_files:
             f.close()
-                
+
         session_id = "test_multi_doc_chat"
-        
+
         rag = ConversationalRAG(session_id=session_id, retriever=retriever)
-        
+
         question = "what is President Zelenskyy said in their speech in parliament?"
-        
+
         answer=rag.invoke(question)
-        
+
         print("\n Question:", question)
-        
+
         print("Answer:", answer)
-        
+
         if not uploaded_files:
             print("No valid files to upload.")
             sys.exit(1)
-            
+
     except Exception as e:
         print(f"Test failed: {str(e)}")
         sys.exit(1)
-        
+
 if __name__ == "__main__":
     test_document_ingestion_and_rag()
