@@ -9,6 +9,6 @@ repos:
     hooks:
       - id: pytest
         name: pytest(unit tests)
-        entry: python -m pytest -q tests/
+        entry: /Users/yashpatil/Developer/AI/LLMOps/Proj1/document_portal/proj_env/bin/python -m pytest -q tests/
         language: system
         pass_filenames: false
