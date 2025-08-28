@@ -1,0 +1,14 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest(unit tests)
+        entry: bash -c 'pytest -q tests/'
+        language: system
+        pass_filenames: false
