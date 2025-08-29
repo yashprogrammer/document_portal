@@ -54,8 +54,8 @@ async def analyze_document(file: UploadFile = File(...)) -> Any:
     try:
         log.info(f"Received file for analysis: {file.filename}")
         dh = DocHandler()
-        saved_path = dh.save_pdf(FastAPIFileAdapter(file))
-        text = read_pdf_via_handler(dh, saved_path)
+        saved_path = dh.save_file(FastAPIFileAdapter(file))
+        text = dh.read_text(saved_path)
         analyzer = DocumentAnalyzer()
         result = analyzer.analyze_document(text)
         log.info("Document analysis complete.")
