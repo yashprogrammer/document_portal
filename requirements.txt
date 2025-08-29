@@ -13,6 +13,9 @@ python-multipart==0.0.20
 PyMuPDF==1.26.3
 structlog==25.4.0
 docx2txt==0.9
+python-pptx==1.0.2
+openpyxl==3.1.5
+xlrd==2.0.1
 ipykernel==6.30.0
 streamlit==1.47.1
 pytest==8.4.1

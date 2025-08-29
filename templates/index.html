@@ -28,12 +28,12 @@
     <section id="tab-analysis" class="tab-panel active">
       <div class="card">
         <h2>🔎 Analyze a Document</h2>
-        <p class="muted">Upload a PDF and get structured analysis.</p>
+        <p class="muted">Upload a file and get structured analysis.</p>
         <form id="form-analyze" class="form-grid" onsubmit="return false;">
           <div class="field">
-            <label for="an-file">Upload PDF</label>
-            <input id="an-file" type="file" accept=".pdf" required />
-            <small class="help">Only .pdf files</small>
+            <label for="an-file">Upload file</label>
+            <input id="an-file" type="file" accept=".pdf,.docx,.pptx,.md,.txt,.xlsx,.xls,.csv,.db,.sqlite,.sqlite3" required />
+            <small class="help">Supported files: .pdf, .docx, .pptx, .md, .txt, .xlsx, .xls, .csv, .db, .sqlite, .sqlite3</small>
           </div>
           <div class="actions">
             <button id="btn-analyze" class="btn primary">Run Analysis</button>
