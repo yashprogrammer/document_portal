@@ -412,8 +412,10 @@ class DocHandler:
             raise
 class DocumentComparator:
     """
-    Save, read & combine PDFs for comparison with session-based versioning.
+    Save, read & combine documents for comparison with session-based versioning.
     """
+    ALLOWED_EXTS = {".pdf", ".docx", ".pptx", ".md", ".txt", ".xlsx", ".xls", ".csv", ".db", ".sqlite", ".sqlite3"}
+
     def __init__(self, base_dir: str = "data/document_compare", session_id: Optional[str] = None):
         self.base_dir = Path(base_dir)
         self.session_id = session_id or generate_session_id()
@@ -426,8 +428,9 @@ class DocumentComparator:
             ref_path = self.session_path / reference_file.name
             act_path = self.session_path / actual_file.name
             for fobj, out in ((reference_file, ref_path), (actual_file, act_path)):
-                if not fobj.name.lower().endswith(".pdf"):
-                    raise ValueError("Only PDF files are allowed.")
+                ext = out.suffix.lower()
+                if ext not in self.ALLOWED_EXTS:
+                    raise ValueError(f"Unsupported file type: {ext}. Allowed: {sorted(self.ALLOWED_EXTS)}")
                 with open(out, "wb") as f:
                     if hasattr(fobj, "read"):
                         f.write(fobj.read())
@@ -436,8 +439,22 @@ class DocumentComparator:
             log.info("Files saved", reference=str(ref_path), actual=str(act_path), session=self.session_id)
             return ref_path, act_path
         except Exception as e:
-            log.error("Error saving PDF files", error=str(e), session=self.session_id)
+            log.error("Error saving files", error=str(e), session=self.session_id)
             raise DocumentPortalException("Error saving files", e) from e
+
+    def read_document(self, file_path: Path) -> str:
+        """
+        Generic multi-format reader that reuses DocHandler implementations for non-PDF files.
+        """
+        try:
+            ext = file_path.suffix.lower()
+            if ext == ".pdf":
+                return self.read_pdf(file_path)
+            dh = DocHandler(data_dir=str(self.base_dir), session_id=self.session_id)
+            return dh.read_text(str(file_path))
+        except Exception as e:
+            log.error("Error reading document", file=str(file_path), error=str(e))
+            raise DocumentPortalException("Error reading document", e) from e
 
     def read_pdf(self, pdf_path: Path) -> str:
         try:
@@ -460,9 +477,10 @@ class DocumentComparator:
         try:
             doc_parts = []
             for file in sorted(self.session_path.iterdir()):
-                if file.is_file() and file.suffix.lower() == ".pdf":
-                    content = self.read_pdf(file)
-                    doc_parts.append(f"Document: {file.name}\n{content}")
+                if file.is_file() and file.suffix.lower() in self.ALLOWED_EXTS:
+                    content = self.read_document(file)
+                    if content.strip():
+                        doc_parts.append(f"Document: {file.name}\n{content}")
             combined_text = "\n\n".join(doc_parts)
             log.info("Documents combined", count=len(doc_parts), session=self.session_id)
             return combined_text
