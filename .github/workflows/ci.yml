@@ -4,10 +4,10 @@ name: CI
 on:
   push:
     branches:
-      - developed
+      - dev
   pull_request:
     branches:
-      - developed
+      - dev
 
 jobs:
   test:
