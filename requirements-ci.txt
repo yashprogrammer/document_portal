@@ -15,6 +15,7 @@ python-pptx==1.0.2
 openpyxl==3.1.5
 pytest==8.4.1
 pypdf==5.8.0
+pandas
 cfn-lint
 pre-commit
 -e .
