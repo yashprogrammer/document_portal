@@ -1,3 +1,18 @@
--r requirements-ci.txt
+langchain==0.3.27
+langchain-community==0.3.27
+langchain-core==0.3.72
+langchain-groq==0.3.6
+langchain-google-genai==2.1.8
+faiss-cpu==1.11.0.post1
+python-dotenv==1.1.1
+python-multipart==0.0.20
+PyMuPDF==1.26.3
+structlog==25.4.0
+docx2txt==0.9
+python-pptx==1.0.2
+openpyxl==3.1.5
+xlrd==2.0.1
+pypdf==5.8.0
 deepeval
 openai
+-e .

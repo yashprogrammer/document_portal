@@ -7,10 +7,14 @@ faiss-cpu==1.11.0.post1
 fastapi==0.116.1
 uvicorn==0.35.0
 python-dotenv==1.1.1
+python-multipart==0.0.20
+PyMuPDF==1.26.3
 structlog==25.4.0
 docx2txt==0.9
 python-pptx==1.0.2
 openpyxl==3.1.5
-xlrd==2.0.1
+pytest==8.4.1
 pypdf==5.8.0
+cfn-lint
+pre-commit
 -e .
