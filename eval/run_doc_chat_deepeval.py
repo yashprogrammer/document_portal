@@ -23,9 +23,7 @@ from src.document_ingestion.data_ingestion import ChatIngestor
 from src.document_chat.retrieval import ConversationalRAG
 
 
-DEEP_EVAL_INPUT_DIR = \
-    "/Users/yashpatil/Developer/AI/LLMOps/Proj1/document_portal/data/deep_eval"
-
+DEEPEVAL_INPUT_DIR = os.getenv("DEEPEVAL_INPUT_DIR", "data_deep_eval")
 # Defaults align with the notebook usage
 UPLOAD_BASE = os.getenv("UPLOAD_BASE", "notebook/eval_data")
 FAISS_BASE = os.getenv("FAISS_BASE", "notebook/eval_faiss_index")
@@ -75,7 +73,7 @@ def main():
         log.info("Running in LOCAL mode: .env loaded")
 
     # 1) Build or load FAISS index from the specified directory
-    data_dir = Path(DEEP_EVAL_INPUT_DIR)
+    data_dir = Path(DEEPEVAL_INPUT_DIR)
     assert data_dir.exists(), f"Input dir not found: {data_dir}"
     paths = list_supported_files(data_dir)
     if not paths:
