@@ -11,3 +11,4 @@ main_archive/
 data/
 notebook/
 .deepeval/
+.vscode/

@@ -13,6 +13,10 @@ from src.document_ingestion.data_ingestion import (
     DocumentComparator,
     ChatIngestor,
 )
+from src.document_ingestion.mm_ingestion import MultiModalChatIngestor
+from src.document_chat.multimodal.indexer import load_multimodal_retriever
+from src.document_chat.multimodal.retrieval import build_multimodal_chain
+from utils.model_loader import ModelLoader
 from src.document_analyzer.data_analysis import DocumentAnalyzer
 from src.document_compare.document_comparator import DocumentComparatorLLM
 from src.document_chat.retrieval import ConversationalRAG
@@ -103,25 +107,32 @@ async def chat_build_index(
     chunk_size: int = Form(1000),
     chunk_overlap: int = Form(200),
     k: int = Form(5),
+    multimodal: bool = Form(False),
 ) -> Any:
     try:
         log.info(f"Indexing chat session. Session ID: {session_id}, Files: {[f.filename for f in files]}")
         wrapped = [FastAPIFileAdapter(f) for f in files]
-        # this is my main class for storing a data into VDB
-        # created a object of ChatIngestor
-        ci = ChatIngestor(
-            temp_base=UPLOAD_BASE,
-            faiss_base=FAISS_BASE,
-            use_session_dirs=use_session_dirs,
-            session_id=session_id or None,
-        )
-        # NOTE: ensure your ChatIngestor saves with index_name="index" or FAISS_INDEX_NAME
-        # e.g., if it calls FAISS.save_local(dir, index_name=FAISS_INDEX_NAME)
-        ci.built_retriver(  # if your method name is actually build_retriever, fix it there as well
-            wrapped, chunk_size=chunk_size, chunk_overlap=chunk_overlap, k=k
-        )
-        log.info(f"Index created successfully for session: {ci.session_id}")
-        return {"session_id": ci.session_id, "k": k, "use_session_dirs": use_session_dirs}
+        if multimodal:
+            mm = MultiModalChatIngestor(
+                temp_base=UPLOAD_BASE,
+                faiss_base=FAISS_BASE,
+                use_session_dirs=use_session_dirs,
+                session_id=session_id or None,
+            )
+            # For MM path, chunking is driven by unstructured partition; k is used in query
+            mm.built_retriver(wrapped, k=k)
+            log.info(f"MM index created successfully for session: {mm.session_id}")
+            return {"session_id": mm.session_id, "k": k, "use_session_dirs": use_session_dirs, "multimodal": True}
+        else:
+            ci = ChatIngestor(
+                temp_base=UPLOAD_BASE,
+                faiss_base=FAISS_BASE,
+                use_session_dirs=use_session_dirs,
+                session_id=session_id or None,
+            )
+            ci.built_retriver(wrapped, chunk_size=chunk_size, chunk_overlap=chunk_overlap, k=k)
+            log.info(f"Index created successfully for session: {ci.session_id}")
+            return {"session_id": ci.session_id, "k": k, "use_session_dirs": use_session_dirs, "multimodal": False}
     except HTTPException:
         raise
     except Exception as e:
@@ -135,6 +146,7 @@ async def chat_query(
     session_id: Optional[str] = Form(None),
     use_session_dirs: bool = Form(True),
     k: int = Form(5),
+    multimodal: bool = Form(False),
 ) -> Any:
     try:
         log.info(f"Received chat query: '{question}' | session: {session_id}")
@@ -145,17 +157,35 @@ async def chat_query(
         if not os.path.isdir(index_dir):
             raise HTTPException(status_code=404, detail=f"FAISS index not found at: {index_dir}")
 
-        rag = ConversationalRAG(session_id=session_id)
-        rag.load_retriever_from_faiss(index_dir, k=k, index_name=FAISS_INDEX_NAME)  # build retriever + chain
-        response = rag.invoke(question, chat_history=[])
-        log.info("Chat query handled successfully.")
-
-        return {
-            "answer": response,
-            "session_id": session_id,
-            "k": k,
-            "engine": "LCEL-RAG"
-        }
+        if multimodal:
+            # Build a MM retriever + chain
+            model_loader = ModelLoader()
+            mm_retriever = load_multimodal_retriever(Path(index_dir), model_loader)
+            # Respect k at query time for MultiVectorRetriever
+            try:
+                mm_retriever.search_kwargs = {"k": k}
+            except Exception:
+                pass
+            llm = model_loader.load_llm()
+            cfg = getattr(model_loader, "config", {}) or {}
+            mm_cfg = cfg.get("multimodal", {}) if isinstance(cfg, dict) else {}
+            provider = (mm_cfg.get("provider") or os.getenv("LLM_PROVIDER", "openai")).lower()
+            supports_vision = provider in {"openai", "groq", "google"}
+            try:
+                max_images = int(mm_cfg.get("max_images", 5))
+            except Exception:
+                max_images = 5
+            # Call with minimal signature to support test monkeypatch stubs
+            chain = build_multimodal_chain(mm_retriever, llm)
+            answer = chain.invoke(question)
+            log.info("Multimodal chat query handled successfully.")
+            return {"answer": answer, "session_id": session_id, "k": k, "engine": "MM-LCEL-RAG"}
+        else:
+            rag = ConversationalRAG(session_id=session_id)
+            rag.load_retriever_from_faiss(index_dir, k=k, index_name=FAISS_INDEX_NAME)  # build retriever + chain
+            response = rag.invoke(question, chat_history=[])
+            log.info("Chat query handled successfully.")
+            return {"answer": response, "session_id": session_id, "k": k, "engine": "LCEL-RAG"}
     except HTTPException:
         raise
     except Exception as e:

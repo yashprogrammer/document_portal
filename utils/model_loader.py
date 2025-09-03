@@ -1,17 +1,23 @@
 import os
+import platform
 import sys
 import json
 from dotenv import load_dotenv
 from utils.config_loader import load_config
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from logger import GLOBAL_LOGGER as log
 from exception.custom_exception import DocumentPortalException
 from utils.llm_cache import init_llm_cache
 
+# macOS OpenMP duplicate runtime workaround
+if platform.system() == "Darwin" and os.environ.get("KMP_DUPLICATE_LIB_OK") is None:
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 
 class ApiKeyManager:
-    REQUIRED_KEYS = ["GROQ_API_KEY", "GOOGLE_API_KEY"]
+    REQUIRED_KEYS = ["GROQ_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY"]
 
     def __init__(self):
         self.api_keys = {}
@@ -88,7 +94,7 @@ class ModelLoader:
         Load and return the configured LLM model.
         """
         llm_block = self.config["llm"]
-        provider_key = os.getenv("LLM_PROVIDER", "google")
+        provider_key = os.getenv("LLM_PROVIDER", "openai")
 
         if provider_key not in llm_block:
             log.error("LLM provider not found in config", provider=provider_key)
@@ -117,13 +123,13 @@ class ModelLoader:
                 temperature=temperature,
             )
 
-        # elif provider == "openai":
-        #     return ChatOpenAI(
-        #         model=model_name,
-        #         api_key=self.api_key_mgr.get("OPENAI_API_KEY"),
-        #         temperature=temperature,
-        #         max_tokens=max_tokens
-        #     )
+        elif provider == "openai":
+            return ChatOpenAI(
+                model=model_name,
+                api_key=self.api_key_mgr.get("OPENAI_API_KEY"),
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
 
         else:
             log.error("Unsupported LLM provider", provider=provider)

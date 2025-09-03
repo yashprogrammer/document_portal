@@ -121,6 +121,13 @@
                 <span class="slider"></span>
               </label>
             </div>
+            <div class="field toggle-row">
+              <label>Use multimodal (tables + images)</label>
+              <label class="switch">
+                <input id="chat-mm" type="checkbox" />
+                <span class="slider"></span>
+              </label>
+            </div>
           </div>
 
           <div class="actions">
@@ -257,6 +264,8 @@
       fd.append("chunk_size", String(chunk));
       fd.append("chunk_overlap", String(overlap));
       fd.append("k", String(k));
+      const mm = document.getElementById("chat-mm").checked;
+      fd.append("multimodal", mm ? "true" : "false");
 
       const res = await fetch(`${API_BASE}/chat/index`, { method: "POST", body: fd });
       if (!res.ok) {
@@ -291,6 +300,8 @@
       fd.append("use_session_dirs", useSess ? "true" : "false");
       fd.append("k", String(k));
       if (useSess && currentSession) fd.append("session_id", currentSession);
+      const mm = document.getElementById("chat-mm").checked;
+      fd.append("multimodal", mm ? "true" : "false");
 
       const res = await fetch(`${API_BASE}/chat/query`, { method: "POST", body: fd });
       if (!res.ok) {
