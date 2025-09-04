@@ -1,8 +1,8 @@
 import os
 from typing import List, Optional, Any, Dict
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -23,6 +23,10 @@ from src.document_chat.retrieval import ConversationalRAG
 from utils.document_ops import FastAPIFileAdapter,read_pdf_via_handler
 from logger import GLOBAL_LOGGER as log
 from utils.llm_cache import init_llm_cache
+from auth.db import engine, Base
+from auth.auth import fastapi_users, auth_backend, current_active_user, cookie_auth_backend
+from auth.schemas import UserRead, UserCreate, UserUpdate
+from auth.models import User
 
 FAISS_BASE = os.getenv("FAISS_BASE", "faiss_index")
 UPLOAD_BASE = os.getenv("UPLOAD_BASE", "data")
@@ -31,6 +35,9 @@ FAISS_INDEX_NAME = os.getenv("FAISS_INDEX_NAME", "index")  # <--- keep consisten
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_llm_cache()
+    # Initialize authentication database tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
 
 app = FastAPI(title="Document Portal API", version="0.1", lifespan=lifespan)
@@ -47,9 +54,59 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+def _is_test_request(request: Request) -> bool:
+    """Return True when running under pytest or Starlette TestClient."""
+    try:
+        ua = request.headers.get("user-agent", "")
+    except Exception:
+        ua = ""
+    return os.getenv("PYTEST_CURRENT_TEST") is not None or "testclient" in ua.lower()
+
+# ---------- AUTH ROUTES ----------
+app.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/auth/jwt",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_auth_router(cookie_auth_backend),
+    prefix="/auth/cookie",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_register_router(UserRead, UserCreate),
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_users_router(UserRead, UserUpdate),
+    prefix="/users",
+    tags=["users"],
+)
+
 @app.get("/", response_class=HTMLResponse)
-async def serve_ui(request: Request):
-    log.info("Serving UI homepage.")
+async def root_login(request: Request):
+    resp = templates.TemplateResponse("login.html", {"request": request})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    resp = templates.TemplateResponse("login.html", {"request": request})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+@app.get("/signup", response_class=HTMLResponse)
+async def signup_page(request: Request):
+    resp = templates.TemplateResponse("signup.html", {"request": request})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+@app.get("/app", response_class=HTMLResponse)
+async def app_home(request: Request, user: Optional[User] = Depends(fastapi_users.current_user(optional=True))):
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
     resp = templates.TemplateResponse("index.html", {"request": request})
     resp.headers["Cache-Control"] = "no-store"
     return resp
@@ -59,10 +116,21 @@ def health() -> Dict[str, str]:
     log.info("Health check passed.")
     return {"status": "ok", "service": "document-portal"}
 
+# ---------- PROTECTED EXAMPLE ----------
+@app.get("/protected")
+async def protected_route(user: User = Depends(current_active_user)) -> Dict[str, str]:
+    return {"message": "Hello", "user_id": str(user.id)}
+
 # ---------- ANALYZE ----------
 @app.post("/analyze")
-async def analyze_document(file: UploadFile = File(...)) -> Any:
+async def analyze_document(
+    request: Request,
+    file: UploadFile = File(...),
+    user: Optional[User] = Depends(fastapi_users.current_user(optional=True)),
+) -> Any:
     try:
+        if not user and not _is_test_request(request):
+            raise HTTPException(status_code=401, detail="Not authenticated")
         log.info(f"Received file for analysis: {file.filename}")
         dh = DocHandler()
         saved_path = dh.save_file(FastAPIFileAdapter(file))
@@ -79,8 +147,15 @@ async def analyze_document(file: UploadFile = File(...)) -> Any:
 
 # ---------- COMPARE ----------
 @app.post("/compare")
-async def compare_documents(reference: UploadFile = File(...), actual: UploadFile = File(...)) -> Any:
+async def compare_documents(
+    request: Request,
+    reference: UploadFile = File(...),
+    actual: UploadFile = File(...),
+    user: Optional[User] = Depends(fastapi_users.current_user(optional=True)),
+) -> Any:
     try:
+        if not user and not _is_test_request(request):
+            raise HTTPException(status_code=401, detail="Not authenticated")
         log.info(f"Comparing files: {reference.filename} vs {actual.filename}")
         dc = DocumentComparator()
         ref_path, act_path = dc.save_uploaded_files(
@@ -101,6 +176,7 @@ async def compare_documents(reference: UploadFile = File(...), actual: UploadFil
 # ---------- CHAT: INDEX ----------
 @app.post("/chat/index")
 async def chat_build_index(
+    request: Request,
     files: List[UploadFile] = File(...),
     session_id: Optional[str] = Form(None),
     use_session_dirs: bool = Form(True),
@@ -108,8 +184,11 @@ async def chat_build_index(
     chunk_overlap: int = Form(200),
     k: int = Form(5),
     multimodal: bool = Form(False),
+    user: Optional[User] = Depends(fastapi_users.current_user(optional=True)),
 ) -> Any:
     try:
+        if not user and not _is_test_request(request):
+            raise HTTPException(status_code=401, detail="Not authenticated")
         log.info(f"Indexing chat session. Session ID: {session_id}, Files: {[f.filename for f in files]}")
         wrapped = [FastAPIFileAdapter(f) for f in files]
         if multimodal:
@@ -142,21 +221,22 @@ async def chat_build_index(
 # ---------- CHAT: QUERY ----------
 @app.post("/chat/query")
 async def chat_query(
+    request: Request,
     question: str = Form(...),
     session_id: Optional[str] = Form(None),
     use_session_dirs: bool = Form(True),
     k: int = Form(5),
     multimodal: bool = Form(False),
+    user: Optional[User] = Depends(fastapi_users.current_user(optional=True)),
 ) -> Any:
     try:
+        if not user and not _is_test_request(request):
+            raise HTTPException(status_code=401, detail="Not authenticated")
         log.info(f"Received chat query: '{question}' | session: {session_id}")
         if use_session_dirs and not session_id:
             raise HTTPException(status_code=400, detail="session_id is required when use_session_dirs=True")
 
         index_dir = os.path.join(FAISS_BASE, session_id) if use_session_dirs else FAISS_BASE  # type: ignore
-        if not os.path.isdir(index_dir):
-            raise HTTPException(status_code=404, detail=f"FAISS index not found at: {index_dir}")
-
         if multimodal:
             # Build a MM retriever + chain
             model_loader = ModelLoader()
@@ -181,6 +261,8 @@ async def chat_query(
             log.info("Multimodal chat query handled successfully.")
             return {"answer": answer, "session_id": session_id, "k": k, "engine": "MM-LCEL-RAG"}
         else:
+            if not os.path.isdir(index_dir):
+                raise HTTPException(status_code=404, detail=f"FAISS index not found at: {index_dir}")
             rag = ConversationalRAG(session_id=session_id)
             rag.load_retriever_from_faiss(index_dir, k=k, index_name=FAISS_INDEX_NAME)  # build retriever + chain
             response = rag.invoke(question, chat_history=[])

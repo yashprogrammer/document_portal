@@ -29,4 +29,10 @@ unstructured
 pillow
 opencv-python-headless
 pytesseract
+fastapi-users[sqlalchemy]
+fastapi-users-db-sqlalchemy
+sqlalchemy>=2
+aiosqlite
+passlib[bcrypt]
+pyjwt
 -e .

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Sign up • Document Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="/static/style.css" rel="stylesheet" />
+</head>
+<body>
+  <main class="container narrow">
+    <div class="card">
+      <h2>Sign up</h2>
+      <p class="muted">Create an account to access the app.</p>
+      <form id="form-signup" class="form-grid" onsubmit="return false;">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" required />
+        </div>
+        <div class="field">
+          <label for="name">Full name (optional)</label>
+          <input id="name" type="text" />
+        </div>
+        <div class="actions">
+          <button id="btn-signup" class="btn primary">Create account</button>
+          <a class="btn" href="/login">Back to login</a>
+        </div>
+        <div id="msg" class="small muted"></div>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    document.getElementById("btn-signup").addEventListener("click", async () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const full_name = document.getElementById("name").value.trim() || null;
+      const msg = document.getElementById("msg");
+      msg.textContent = "Creating account…";
+      try {
+        const res = await fetch("/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, full_name })
+        });
+        if(!res.ok){
+          const err = await res.json().catch(()=>({detail:res.statusText}));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+        msg.textContent = "Account created. Redirecting to login…";
+        setTimeout(()=>{ window.location.href = "/login"; }, 800);
+      } catch(e){
+        msg.textContent = "Signup failed: " + (e.message || e);
+      }
+    });
+  </script>
+</body>
+</html>
+
+
