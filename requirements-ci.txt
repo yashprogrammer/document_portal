@@ -22,8 +22,17 @@ streamlit==1.47.1
 pytest==8.4.1
 pypdf==5.8.0
 cfn-lint
--e .
+pre-commit
+deepeval
+openai
 unstructured
 pillow
 opencv-python-headless
 pytesseract
+fastapi-users[sqlalchemy]
+fastapi-users-db-sqlalchemy
+sqlalchemy>=2
+aiosqlite
+passlib[bcrypt]
+pyjwt
+-e .
