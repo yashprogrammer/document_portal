@@ -12,3 +12,5 @@ data/
 notebook/
 .deepeval/
 .vscode/
+
+users.db
