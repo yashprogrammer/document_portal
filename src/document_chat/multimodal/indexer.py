@@ -78,6 +78,88 @@ def load_multimodal_retriever(session_faiss_dir: Path, model_loader: ModelLoader
     return MultiVectorRetriever(vectorstore=vs, docstore=store, id_key="doc_id")
 
 
+def load_multimodal_handles(session_faiss_dir: Path, model_loader: ModelLoader) -> Tuple[MultiVectorRetriever, LocalFileStore]:
+    """
+    Return both the MultiVectorRetriever and its LocalFileStore for a session.
+
+    This is useful for evaluation where we need to resolve raw payloads by doc_id.
+    """
+    vs = load_faiss_from_dir(session_faiss_dir, model_loader)
+    store = LocalFileStore(str(session_faiss_dir / "mm_store"))
+    retriever = MultiVectorRetriever(vectorstore=vs, docstore=store, id_key="doc_id")
+    return retriever, store
+
+
+def build_mm_eval_context(question: str, retriever: MultiVectorRetriever, k: int = 5) -> List[str]:
+    """
+    Build a normalized textual context list for DeepEval from the multimodal retriever.
+
+    - Retrieves top-k summary Documents
+    - For each, resolves the raw payload via doc_id from the LocalFileStore
+    - Normalizes by modality into short, textual strings suitable for DeepEval context
+    """
+    try:
+        # Retrieve top-k summary docs using underlying vectorstore
+        try:
+            docs = retriever.vectorstore.similarity_search(question, k=k)
+        except Exception:
+            # Fallback to retriever API if available
+            docs = retriever.get_relevant_documents(question)  # type: ignore[attr-defined]
+
+        out: List[str] = []
+        id_key = getattr(retriever, "id_key", "doc_id")
+        store = retriever.docstore
+
+        # Collect payloads by doc_id
+        doc_ids: List[str] = []
+        for d in docs:
+            did = d.metadata.get(id_key)
+            if isinstance(did, str):
+                doc_ids.append(did)
+            else:
+                doc_ids.append("")
+
+        payloads = []
+        try:
+            payloads = list(store.mget(doc_ids)) if hasattr(store, "mget") else []  # type: ignore[attr-defined]
+        except Exception:
+            payloads = []
+
+        # Normalize contexts
+        for i, d in enumerate(docs):
+            modality = str(d.metadata.get("modality", "unknown"))
+            summary = d.page_content or ""
+            payload = payloads[i] if i < len(payloads) else None
+
+            payload_str: str = ""
+            if isinstance(payload, bytes):
+                try:
+                    payload_str = payload.decode("utf-8", errors="ignore")
+                except Exception:
+                    payload_str = ""
+            elif isinstance(payload, str):
+                payload_str = payload
+            else:
+                payload_str = ""
+
+            # For images, payload may be base64 or a file path; prefer textual summary
+            if modality == "image":
+                normalized = f"modality: image; summary: {summary[:500]}"
+            elif modality in {"text", "table"}:
+                body = payload_str or summary
+                normalized = f"modality: {modality}; content: {body[:1000]}"
+            else:
+                body = payload_str or summary
+                normalized = f"modality: {modality}; content: {body[:800]}"
+
+            out.append(normalized)
+
+        # Keep at most k contexts
+        return out[:k]
+    except Exception:
+        return []
+
+
 # --------------------------- PDF partition & summarization ---------------------------
 
 def partition_pdf_to_modalities(
