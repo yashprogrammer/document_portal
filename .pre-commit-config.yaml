@@ -1,0 +1,8 @@
+repos:
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest(unit tests)
+        entry: /Users/yashpatil/Developer/AI/LLMOps/Proj1/document_portal/proj_env/bin/python -m pytest -q -v tests/
+        language: system
+        pass_filenames: false

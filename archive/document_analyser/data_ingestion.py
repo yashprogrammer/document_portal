@@ -19,10 +19,10 @@ class DocumentHandler:
                 os.path.join(os.getcwd(), "data", "document_analysis")
             )
             self.session_id = session_id or f"session_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
-            
+
             # Create base session directory
             self.session_path = os.path.join(self.data_dir, self.session_id)
-            
+
             os.makedirs(self.session_path, exist_ok=True)
 
             self.log.info("PDFHandler initialized", session_id=self.session_id, session_path=self.session_path)
@@ -30,24 +30,24 @@ class DocumentHandler:
         except Exception as e:
             self.log.error(f"Error initializing DocumentHandler: {e}")
             raise DocumentPortalException("Error initializing DocumentHandler", e) from e
-        
+
 
     def save_pdf(self,uploaded_file):
         try:
             filename = os.path.basename(uploaded_file.name)
-            
+
             if not filename.lower().endswith(".pdf"):
                 raise DocumentPortalException("Invalid file type. Only PDFs are allowed.")
 
             save_path = os.path.join(self.session_path, filename)
-            
+
             with open(save_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
             self.log.info("PDF saved successfully", file=filename, save_path=save_path, session_id=self.session_id)
-            
+
             return save_path
-        
+
         except Exception as e:
             self.log.error(f"Error saving PDF: {e}")
             raise DocumentPortalException("Error saving PDF", e) from e
@@ -83,7 +83,7 @@ if __name__ == "__main__":
            pass
         def getbuffer(self):
             return open(self._file_path, 'rb').read()
-        
+
     dummy_file = DummyFile(pdf_path)
     handler = DocumentHandler()
 
@@ -92,7 +92,6 @@ if __name__ == "__main__":
         print("PDF saved successfully.", saved_path)
 
         text = handler.read_pdf(saved_path)
-        print("PDF read successfully. Text length:", text[:1000]) 
+        print("PDF read successfully. Text length:", text[:1000])
     except Exception as e:
         print(f"Error: {e}")
-

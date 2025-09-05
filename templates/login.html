@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Login • Document Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="/static/style.css" rel="stylesheet" />
+</head>
+<body>
+  <main class="container narrow">
+    <div class="card">
+      <h2>Login</h2>
+      <p class="muted">Use your email and password to continue.</p>
+      <form id="form-login" class="form-grid" onsubmit="return false;">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" required />
+        </div>
+        <div class="actions">
+          <button id="btn-login" class="btn primary">Login</button>
+          <a class="btn" href="/signup">Sign up</a>
+        </div>
+        <div id="msg" class="small muted"></div>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    const tokenKey = "dp_jwt";
+    function setToken(t){ if(t) localStorage.setItem(tokenKey, t); }
+    document.getElementById("btn-login").addEventListener("click", async () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const msg = document.getElementById("msg");
+      msg.textContent = "Logging in…";
+      try {
+        const body = new URLSearchParams();
+        body.set("username", email);
+        body.set("password", password);
+        const res = await fetch("/auth/jwt/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body
+        });
+        if(!res.ok){
+          const err = await res.json().catch(()=>({detail:res.statusText}));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+        const json = await res.json();
+        setToken(json.access_token);
+        // Also establish cookie session so that /app redirect check passes
+        try {
+          const resCookie = await fetch("/auth/cookie/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body
+          });
+        } catch (_) {}
+        window.location.href = "/app";
+      } catch(e){
+        msg.textContent = "Login failed: " + (e.message || e);
+      }
+    });
+  </script>
+</body>
+</html>
+
+

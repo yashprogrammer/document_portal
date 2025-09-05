@@ -1,16 +1,23 @@
 import os
+import platform
 import sys
 import json
 from dotenv import load_dotenv
 from utils.config_loader import load_config
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from logger import GLOBAL_LOGGER as log
 from exception.custom_exception import DocumentPortalException
+from utils.llm_cache import init_llm_cache
+
+# macOS OpenMP duplicate runtime workaround
+if platform.system() == "Darwin" and os.environ.get("KMP_DUPLICATE_LIB_OK") is None:
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
 class ApiKeyManager:
-    REQUIRED_KEYS = ["GROQ_API_KEY", "GOOGLE_API_KEY"]
+    REQUIRED_KEYS = ["GROQ_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY"]
 
     def __init__(self):
         self.api_keys = {}
@@ -37,8 +44,13 @@ class ApiKeyManager:
         # Final check
         missing = [k for k in self.REQUIRED_KEYS if not self.api_keys.get(k)]
         if missing:
-            log.error("Missing required API keys", missing_keys=missing)
-            raise DocumentPortalException("Missing API keys", sys)
+            # Enforce strictly only in production or when explicitly requested
+            strict_mode = os.getenv("ENV", "local").lower() == "production" or os.getenv("STRICT_API_KEYS", "false").lower() in {"1", "true", "yes"}
+            if strict_mode:
+                log.error("Missing required API keys", missing_keys=missing)
+                raise DocumentPortalException("Missing API keys", sys)
+            else:
+                log.warning("Missing API keys - continuing in non-strict mode", missing_keys=missing)
 
         log.info("API keys loaded", keys={k: v[:6] + "..." for k, v in self.api_keys.items()})
 
@@ -62,6 +74,9 @@ class ModelLoader:
         else:
             log.info("Running in PRODUCTION mode")
 
+        # Ensure LLM cache is initialized for non-API entry points as well
+        init_llm_cache()
+
         self.api_key_mgr = ApiKeyManager()
         self.config = load_config()
         log.info("YAML config loaded", config_keys=list(self.config.keys()))
@@ -84,7 +99,7 @@ class ModelLoader:
         Load and return the configured LLM model.
         """
         llm_block = self.config["llm"]
-        provider_key = os.getenv("LLM_PROVIDER", "google")
+        provider_key = os.getenv("LLM_PROVIDER", "openai")
 
         if provider_key not in llm_block:
             log.error("LLM provider not found in config", provider=provider_key)
@@ -113,13 +128,13 @@ class ModelLoader:
                 temperature=temperature,
             )
 
-        # elif provider == "openai":
-        #     return ChatOpenAI(
-        #         model=model_name,
-        #         api_key=self.api_key_mgr.get("OPENAI_API_KEY"),
-        #         temperature=temperature,
-        #         max_tokens=max_tokens
-        #     )
+        elif provider == "openai":
+            return ChatOpenAI(
+                model=model_name,
+                api_key=self.api_key_mgr.get("OPENAI_API_KEY"),
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
 
         else:
             log.error("Unsupported LLM provider", provider=provider)

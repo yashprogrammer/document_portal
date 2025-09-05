@@ -31,7 +31,7 @@
           "name": "apikeyliveclass",
           "valueFrom": "arn:aws:secretsmanager:us-east-1:306570692493:secret:apikeyliveclass-EykEZf"
         }
-        
+
       ],
       "logConfiguration": {
         "logDriver": "awslogs",

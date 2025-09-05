@@ -170,3 +170,47 @@ class ConversationalRAG:
         except Exception as e:
             log.error("Failed to build LCEL chain", error=str(e), session_id=self.session_id)
             raise DocumentPortalException("Failed to build LCEL chain", sys)
+        
+
+    def get_retrieved_context(self, question: str, k: Optional[int] = None) -> str:
+        """
+        Retrieve relevant documents for a question and return the context as formatted text.
+        
+        Args:
+            question: The question to retrieve context for
+            k: Number of documents to retrieve (optional, uses retriever default if not provided)
+            
+        Returns:
+            str: Formatted text containing the retrieved document content
+            
+        Raises:
+            DocumentPortalException: If retriever is not set or retrieval fails
+        """
+        try:
+            if self.retriever is None:
+                raise DocumentPortalException("No retriever set. Call load_retriever_from_faiss first.", sys)
+            
+            # If k is provided, temporarily update the retriever's search kwargs
+            if k is not None:
+                original_k = self.retriever.search_kwargs.get("k")
+                self.retriever.search_kwargs["k"] = k
+            
+            # Retrieve documents
+            docs = self.retriever.invoke(question)
+            
+            # Restore original k if it was modified
+            if k is not None and original_k is not None:
+                self.retriever.search_kwargs["k"] = original_k
+            
+            # Format and return the context
+            context = self._format_docs(docs)
+            log.info("Retrieved context", 
+                    session_id=self.session_id, 
+                    num_docs=len(docs), 
+                    context_length=len(context))
+            
+            return context
+            
+        except Exception as e:
+            log.error("Failed to retrieve context", error=str(e), session_id=self.session_id)
+            raise DocumentPortalException("Failed to retrieve context", sys)

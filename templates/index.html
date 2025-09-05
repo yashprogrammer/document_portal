@@ -28,12 +28,12 @@
     <section id="tab-analysis" class="tab-panel active">
       <div class="card">
         <h2>🔎 Analyze a Document</h2>
-        <p class="muted">Upload a PDF and get structured analysis.</p>
+        <p class="muted">Upload a file and get structured analysis.</p>
         <form id="form-analyze" class="form-grid" onsubmit="return false;">
           <div class="field">
-            <label for="an-file">Upload PDF</label>
-            <input id="an-file" type="file" accept=".pdf" required />
-            <small class="help">Only .pdf files</small>
+            <label for="an-file">Upload file</label>
+            <input id="an-file" type="file" accept=".pdf,.docx,.pptx,.md,.txt,.xlsx,.xls,.csv,.db,.sqlite,.sqlite3" required />
+            <small class="help">Supported files: .pdf, .docx, .pptx, .md, .txt, .xlsx, .xls, .csv, .db, .sqlite, .sqlite3</small>
           </div>
           <div class="actions">
             <button id="btn-analyze" class="btn primary">Run Analysis</button>
@@ -50,15 +50,15 @@
     <section id="tab-compare" class="tab-panel">
       <div class="card">
         <h2>🆚 Compare Two Documents</h2>
-        <p class="muted">Upload a reference PDF and an actual PDF to see page-wise differences.</p>
+        <p class="muted">Upload a reference file and an actual file to see page-wise differences.</p>
         <form id="form-compare" class="form-grid-2" onsubmit="return false;">
           <div class="field">
-            <label for="cmp-ref">Reference PDF</label>
-            <input id="cmp-ref" type="file" accept=".pdf" required />
+            <label for="cmp-ref">Reference file</label>
+            <input id="cmp-ref" type="file" accept=".pdf,.docx,.pptx,.md,.txt,.xlsx,.xls,.csv,.db,.sqlite,.sqlite3" required />
           </div>
           <div class="field">
-            <label for="cmp-act">Actual PDF</label>
-            <input id="cmp-act" type="file" accept=".pdf" required />
+            <label for="cmp-act">Actual file</label>
+            <input id="cmp-act" type="file" accept=".pdf,.docx,.pptx,.md,.txt,.xlsx,.xls,.csv,.db,.sqlite,.sqlite3" required />
           </div>
           <div class="actions span-2">
             <button id="btn-compare" class="btn primary">Compare</button>
@@ -121,6 +121,13 @@
                 <span class="slider"></span>
               </label>
             </div>
+            <div class="field toggle-row">
+              <label>Use multimodal (tables + images)</label>
+              <label class="switch">
+                <input id="chat-mm" type="checkbox" />
+                <span class="slider"></span>
+              </label>
+            </div>
           </div>
 
           <div class="actions">
@@ -148,6 +155,7 @@
         </div>
       </div>
     </section>
+
   </main>
 
   <footer class="app-footer">
@@ -158,10 +166,31 @@
   <script>
   // Base URL for API (same origin when opened via FastAPI)
   const API_BASE = "";
+  // Minimal auth helpers available early
+  const tokenKey = "dp_jwt";
+  function getToken() { return localStorage.getItem(tokenKey); }
+  function setToken(t) { if (t) localStorage.setItem(tokenKey, t); }
+  function clearToken() { localStorage.removeItem(tokenKey); }
+  function authHeader() {
+    const t = getToken();
+    return t ? { "Authorization": `Bearer ${t}` } : {};
+  }
+  // Redirect to /login if not authenticated
+  if (!getToken()) {
+    window.location.href = "/login";
+  }
 
   // Tab switching (unchanged)
   const tabs = document.querySelectorAll(".tab-btn");
   const panels = document.querySelectorAll(".tab-panel");
+  function selectTab(tabName){
+    tabs.forEach(b => b.classList.remove("active"));
+    panels.forEach(p => p.classList.remove("active"));
+    const btn = Array.from(tabs).find(b => b.dataset.tab === tabName);
+    const panel = document.getElementById("tab-" + tabName);
+    if (btn) btn.classList.add("active");
+    if (panel) panel.classList.add("active");
+  }
   tabs.forEach(btn => {
     btn.addEventListener("click", () => {
       tabs.forEach(b => b.classList.remove("active"));
@@ -170,7 +199,14 @@
       document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
     });
   });
+  // Respect ?tab=analysis|compare|chat or #analysis etc.
+  try {
+    const url = new URL(window.location.href);
+    const tabParam = url.searchParams.get("tab") || (location.hash ? location.hash.substring(1) : null);
+    if (tabParam) selectTab(tabParam);
+  } catch(_) {}
 
+  // (Auth UI removed)
   // ===== ANALYZE =====
   document.getElementById("btn-analyze").addEventListener("click", async () => {
     const file = document.getElementById("an-file").files[0];
@@ -182,7 +218,7 @@
       const fd = new FormData();
       fd.append("file", file); // <-- must be 'file' to match FastAPI
 
-      const res = await fetch(`${API_BASE}/analyze`, { method: "POST", body: fd });
+      const res = await fetch(`${API_BASE}/analyze`, { method: "POST", headers: { ...authHeader() }, body: fd });
       if (!res.ok) {
         const err = await res.json().catch(()=>({detail:res.statusText}));
         throw new Error(err.detail || `HTTP ${res.status}`);
@@ -212,7 +248,7 @@
       fd.append("reference", ref); // <-- must be 'reference'
       fd.append("actual", act);    // <-- must be 'actual'
 
-      const res = await fetch(`${API_BASE}/compare`, { method: "POST", body: fd });
+      const res = await fetch(`${API_BASE}/compare`, { method: "POST", headers: { ...authHeader() }, body: fd });
       if (!res.ok) {
         const err = await res.json().catch(()=>({detail:res.statusText}));
         throw new Error(err.detail || `HTTP ${res.status}`);
@@ -257,8 +293,10 @@
       fd.append("chunk_size", String(chunk));
       fd.append("chunk_overlap", String(overlap));
       fd.append("k", String(k));
+      const mm = document.getElementById("chat-mm").checked;
+      fd.append("multimodal", mm ? "true" : "false");
 
-      const res = await fetch(`${API_BASE}/chat/index`, { method: "POST", body: fd });
+      const res = await fetch(`${API_BASE}/chat/index`, { method: "POST", headers: { ...authHeader() }, body: fd });
       if (!res.ok) {
         const err = await res.json().catch(()=>({detail:res.statusText}));
         throw new Error(err.detail || `HTTP ${res.status}`);
@@ -291,8 +329,10 @@
       fd.append("use_session_dirs", useSess ? "true" : "false");
       fd.append("k", String(k));
       if (useSess && currentSession) fd.append("session_id", currentSession);
+      const mm = document.getElementById("chat-mm").checked;
+      fd.append("multimodal", mm ? "true" : "false");
 
-      const res = await fetch(`${API_BASE}/chat/query`, { method: "POST", body: fd });
+      const res = await fetch(`${API_BASE}/chat/query`, { method: "POST", headers: { ...authHeader() }, body: fd });
       if (!res.ok) {
         const err = await res.json().catch(()=>({detail:res.statusText}));
         throw new Error(err.detail || `HTTP ${res.status}`);
