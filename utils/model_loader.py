@@ -44,8 +44,13 @@ class ApiKeyManager:
         # Final check
         missing = [k for k in self.REQUIRED_KEYS if not self.api_keys.get(k)]
         if missing:
-            log.error("Missing required API keys", missing_keys=missing)
-            raise DocumentPortalException("Missing API keys", sys)
+            # Enforce strictly only in production or when explicitly requested
+            strict_mode = os.getenv("ENV", "local").lower() == "production" or os.getenv("STRICT_API_KEYS", "false").lower() in {"1", "true", "yes"}
+            if strict_mode:
+                log.error("Missing required API keys", missing_keys=missing)
+                raise DocumentPortalException("Missing API keys", sys)
+            else:
+                log.warning("Missing API keys - continuing in non-strict mode", missing_keys=missing)
 
         log.info("API keys loaded", keys={k: v[:6] + "..." for k, v in self.api_keys.items()})
 
