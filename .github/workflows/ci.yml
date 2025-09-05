@@ -67,6 +67,11 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      - name: Install system deps for multimodal PDF parsing
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils tesseract-ocr libtesseract-dev libgl1 libmagic1
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
