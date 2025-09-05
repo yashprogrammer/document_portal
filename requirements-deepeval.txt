@@ -25,6 +25,7 @@ deepeval
 openai
 unstructured
 pillow
+pdfminer
 opencv-python-headless
 pytesseract
 fastapi-users[sqlalchemy]
@@ -33,4 +34,7 @@ sqlalchemy>=2
 aiosqlite
 passlib[bcrypt]
 pyjwt
+posthog>=3.0.0
+pdfminer.six>=20220524
+unstructured[pdf]
 -e .
